@@ -1,18 +1,6 @@
 These scripts automate some very tedious processes in romhack porting.
-If a romhack is ported with rm2excoop, skip the first step.
 
-Step 1: Preparing `skyboxes.py`
-1. Put `conv_custom_to_not.py` into the `levels` folder.
-2. Run `conv_custom_to_not.py`.
-
-Step 2: Using `skyboxes.py`
 1. The `levels` and the `textures` folder must be in the same folder as `skyboxes.py`.
 2. Such `textures` folder needs a `skyboxes` folder within it.
 3. `skyconv.exe` needs to be in either the same folder as `skyboxes.py` or in the `skyboxes` folder.
 4. Run `skyboxes.py`.
-Optional: If just running skyconv on all of them without moving anything is required, then put `skyconv_all_on_spot.py` and `skyconv.exe` into the `skyboxes` folder. Then just run `skyconv_all_on_spot.py`.
-
-Step 3 (Optional): Using `actors.py`
-1. The `actors` folder must be in the same folder as `actors.py`.
-2. Run `actors.py`.
-Note that this will not do all of the actors successfully, since the method of doing actors that this script uses is known to fail certain actors.
