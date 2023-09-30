@@ -11,7 +11,6 @@ local cutscene_object = cutscene_object
 local set_time_stop_flags = set_time_stop_flags
 local cur_obj_become_tangible = cur_obj_become_tangible
 local spawn_sync_object = spawn_sync_object
-local get_behavior_from_id = get_behavior_from_id
 local obj_copy_pos_and_angle = obj_copy_pos_and_angle
 local nearest_mario_state_to_object = nearest_mario_state_to_object
 local network_send_object = network_send_object
@@ -73,6 +72,12 @@ local sExclamationBoxContents = {
     { 13, 0, 4, E_MODEL_STAR, id_bhvSpawnedStar },
     { 14, 0, 5, E_MODEL_STAR, id_bhvSpawnedStar },
     { 99, 0, 0, E_MODEL_NONE, nil }
+}
+
+_G.CustomExclamationBox = {
+    getContentsTable = function ()
+        return sExclamationBoxContents
+    end,
 }
 
 ----------------------------
