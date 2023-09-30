@@ -131,6 +131,41 @@ local function spawn_object(parent, model, behavior)
     return obj
 end
 
+--- @param parent Object
+--- @param model ModelExtendedId
+--- @param behavior BehaviorId
+--- @param first_byte integer
+--- @param second_byte integer
+--- @param nearest_mario_object Object
+local function spawn_content(parent, model, behavior, first_byte, second_byte, nearest_mario_object)
+    if not parent then return nil end
+    local obj = spawn_sync_object(behavior, model, parent.oPosX, parent.oPosY, parent.oPosZ, nil)
+    if not obj then error("failed spawn"); return nil end
+
+    obj_copy_pos_and_angle(obj, parent)
+    obj.oVelY = 20
+    obj.oForwardVel = 3
+
+    obj.oMoveAngleYaw = nearest_mario_object and nearest_mario_object.oMoveAngleYaw or 0
+    obj.globalPlayerIndex = nearest_mario_object and nearest_mario_object.globalPlayerIndex or 0
+
+    -- Not assigning a parent object breaks the cutscene
+    -- so it needs to be done manually like this
+    if obj_has_behavior_id(obj, id_bhvSpawnedStar) == 1 then
+        star_spawn_cutscene(obj)
+    end
+
+    if parent.oBehParams & 0xFF000000 == 0 then
+        obj.oBehParams = obj.oBehParams | first_byte << 24
+    else
+        obj.oBehParams = obj.oBehParams | (parent.oBehParams & 0xFF000000)
+    end
+
+    obj.oBehParams = obj.oBehParams | (second_byte << 16)
+
+    return obj
+end
+
 
 --- @param m MarioState
 --- @param model ModelExtendedId
@@ -169,35 +204,12 @@ local function exclamation_box_spawn_contents(exclamation_box_obj, desired_index
         if desired_index == value[1] then
             model = exclamation_replace_model(nearest_mario_state, value[4])
 
-            spawned_object = spawn_object(exclamation_box_obj, model, value[5])
-            if spawned_object then
-                spawned_object.oVelY = 20.0
-                spawned_object.oForwardVel = 3.0
-                if nearest_mario_object then
-                    spawned_object.oMoveAngleYaw = nearest_mario_object.oMoveAngleYaw
-                    spawned_object.globalPlayerIndex = nearest_mario_object.globalPlayerIndex
-                end
-                -- For some reason, without a parent object, stars don't play their cutscene naturally
-                if spawned_object.behavior == get_behavior_from_id(id_bhvSpawnedStar) then
-                    star_spawn_cutscene(spawned_object)
-                end
-            else
+            spawned_object = spawn_content(exclamation_box_obj, model, value[5], value[3], value[2], nearest_mario_object)
+            if not spawned_object then
                 return false
             end
 
-            -- Assign oBehParams to the spawned object in respect to both
-            -- the exclamation box's oBehParams and the contents table
-            spawned_object.oBehParams = spawned_object.oBehParams | ((exclamation_box_obj.oBehParams & 0xFF000000) | (value[3] << 24))
-            spawned_object.oBehParams = spawned_object.oBehParams | (value[2] << 16)
-            if value[4] == E_MODEL_STAR then
-                exclamation_box_obj.oFlags = exclamation_box_obj.oFlags | OBJ_FLAG_PERSISTENT_RESPAWN
-            end
-
-            -- Send non-star events, since sending them causes jank
-            -- ! However, the object's oForwardVel and oVelY don't seem to sync up
-            if value[5] ~= id_bhvSpawnedStar then
-                network_send_object(spawned_object, true)
-            end
+            network_send_object(spawned_object, true)
             break
         end
     end
