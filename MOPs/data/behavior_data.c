@@ -105,6 +105,7 @@ OR_INT(oFlags, OBJ_FLAG_UPDATE_GFX_POS_AND_ANGLE),
 LOAD_COLLISION_DATA(col_Switchblock_Switch_MOP_0x7d7348),
 CALL_NATIVE(bhv_Switchblock_Switch_init),
 BEGIN_LOOP(),
+CALL_NATIVE(load_object_collision_model),
 CALL_NATIVE(bhv_Switchblock_Switch_loop),
 END_LOOP(),
 };
