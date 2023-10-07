@@ -210,8 +210,10 @@ end
 ---@return boolean
 local function is_current_area_sync_valid()
     local np = gNetworkPlayers
-    for i = 0, MAX_PLAYERS - 1, 1 do
-        if np[i] and np[i].connected and (not np[i].currLevelSyncValid or not np[i].currAreaSyncValid) then
+    for i = 1, MAX_PLAYERS - 1, 1 do
+        if np[i] and np[i].connected and
+        (not np[i].currLevelSyncValid or not np[i].currAreaSyncValid) and
+        is_player_in_local_area(gMarioStates[i]) ~= 0 then
             return false
         end
     end
