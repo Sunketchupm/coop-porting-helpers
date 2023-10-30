@@ -91,79 +91,74 @@ def extract_params(line: str) -> list[str]:
 
 
 ### List contains 4 elements per object: VB name, VB count, is start VB, and VB offset
-def find_vb_info(lines: list[str], start_vb_name: str, processed_vb: list[tuple]):
+def find_vb_info(lines: list[str], start_vb_name: str):
     vb_info: list[list] = []
-    found_line = False
-    found_start_line = False
-    start_vb_line = 0
-    is_immediately_past_line = False
-    is_duplicate = False
-    #is_valid_line = False
-
-    vb_being_processed = start_vb_name
+    vb_info_list: list[list[list]] = []
+    immediate_new_vb = False
+    vb_being_processed = ""
     offset = 0
     highest_count = 0
-    line_count = 0
+    found_start_vb = False
     for line in lines:
-        line_count += 1
         line = line.strip()
         function_name = extract_function_name(line)
         # If gsSPVertex, param 0 is VB name, param 1 is count, param 2 doens't matter
         # If gsSP1Triangle or gsSP2Triangles, param 0 is offset
+        # If gsDPSetTextureImage, param 0, 1, and 2 are useless and param 3 is texture image
         params = extract_params(line)
         if params is None:
             continue
-        current_vb_name = params[0]
 
-        if function_name == "gsSPVertex" and start_vb_name == current_vb_name and not found_start_line:
-            for vb_data in processed_vb:
-                if start_vb_name == vb_data[0] and line_count == vb_data[1]:
-                    is_duplicate = True
-                    break
-            if is_duplicate:
-                break
-            found_start_line = True
-            start_vb_line = line_count
-
-            found_line = True
-            is_immediately_past_line = True
-            vb_being_processed = current_vb_name
-        elif (function_name == "gsSPVertex" or function_name == "gsDPSetTextureImage") and found_start_line:
-            found_line = True
-            is_immediately_past_line = True
-            if current_vb_name != vb_being_processed:
+        # initialize and finalize
+        if function_name == "gsDPSetTextureImage":
+            if vb_being_processed != "":
+                if not found_start_vb:
+                    found_start_vb = vb_being_processed == start_vb_name
                 list_to_append = [vb_being_processed, str((highest_count + 1) - int(offset)), vb_being_processed == start_vb_name, offset]
                 vb_info.append(list_to_append)
-            vb_being_processed = current_vb_name
 
-        if found_line and (function_name == "gsSP1Triangle" or function_name == "gsSP2Triangles") and is_immediately_past_line:
+            if found_start_vb:
+                vb_info_list.extend(vb_info.copy())
+                vb_info_list.extend([["NEW TEXTURE", "0", False, "0"]])
+                #print("Found start VB and added to list")
+            vb_info.clear()
+            vb_being_processed = ""
+            found_start_vb = False
+            immediate_new_vb = False
+        # handle vb found
+        elif function_name == "gsSPVertex":
+            if not found_start_vb:
+                found_start_vb = vb_being_processed == start_vb_name
+
+            # new vb found
+            if vb_being_processed != "" and vb_being_processed != params[0]:
+                list_to_append = [vb_being_processed, str((highest_count + 1) - int(offset)), vb_being_processed == start_vb_name, offset]
+                vb_info.append(list_to_append)
+
+            vb_being_processed = params[0]
+            immediate_new_vb = True
+        elif immediate_new_vb and (function_name == "gsSP1Triangle" or function_name == "gsSP2Triangles"):
             offset = params[0]
-            is_immediately_past_line = False
+            immediate_new_vb = False
 
-        if found_line and (function_name == "gsSP1Triangle" or function_name == "gsSP2Triangles"):
+        # get count from vb
+        if function_name == "gsSP1Triangle" or function_name == "gsSP2Triangles":
             highest_param = 0
             for param in params:
                 highest_param = max([highest_param, int(param)])
-            highest_count = max([highest_count, highest_param])
+            highest_count = max([highest_count, highest_param])            
 
-        if found_line and function_name == "gsDPSetTextureImage":
-            processed_vb.append((start_vb_name, start_vb_line))
-            found_line = False
-            found_start_line = False
-            is_immediately_past_line = False
-            vb_being_processed = start_vb_name
-            offset = 0
-            highest_count = 0
-
-    #if is_valid_line:
-    #    print(vb_info)
-    return vb_info
+    return vb_info_list
 
 def process_vb_info(vb_info):
     lines_to_write = []
     total_count = 0
 
     for vb_name, count, is_start, offset in vb_info:
+        if vb_name == "NEW TEXTURE":
+            line = "NEW TEXTURE"
+            lines_to_write.append(line + "\n")
+            continue
         line = f"({vb_name}, {offset}, {count})"
         if is_start:
             line += " START"
@@ -190,7 +185,6 @@ os.chdir(parent_directory)
 start_scroll_VBs = read_lines_from_file("start_scroll_VBs.txt")
 
 vb_info_list = []
-processed_vb_list = []
 for vb_name in start_scroll_VBs:
     vb_name = vb_name.strip()
     course_name = extract_course_name(vb_name)
@@ -201,7 +195,7 @@ for vb_name in start_scroll_VBs:
         try:
             with open(model_file_path, 'r') as file:
                 lines = file.readlines()
-                vb_info = find_vb_info(lines, vb_name, processed_vb_list)
+                vb_info = find_vb_info(lines, vb_name)
                 vb_info_list.append(vb_info)
         except FileNotFoundError:
             i = i # do nothing
@@ -234,6 +228,8 @@ for line in VBs_lines:
             lines_to_write.append(f"-- Count: {count}\n\n")
         else:
             lines_to_write.append(f"-- Could not find scrolling texture with ID <id>\n\n")
+    elif "NEW TEXTURE" in line:
+        lines_to_write.append("----- New texture" + "\n")
     else:
         params = extract_params(line)
         if params is not None:
@@ -272,7 +268,6 @@ write_lines_to_file("scroll_textures.lua", lines_to_write)
 print("Assigned every unique scrolling texture a unique ID")
 #-----------------------------------------------------------
 # Delete txt files
-
 def delete_file(file_path):
     try:
         os.remove(file_path)
