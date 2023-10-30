@@ -27,6 +27,7 @@ local spawn_mist_particles_variable = spawn_mist_particles_variable
 local spawn_triangle_break_particles = spawn_triangle_break_particles
 local play_sound = play_sound
 local cur_obj_hide = cur_obj_hide
+local network_init_object = network_init_object
 
 -------------------------
 ------Helper tables------
@@ -99,6 +100,19 @@ local function star_spawn_cutscene(obj)
     obj.activeFlags = obj.activeFlags | ACTIVE_FLAG_INITIATED_TIME_STOP
 end
 
+---@return boolean
+local function is_current_area_sync_valid()
+    local np = gNetworkPlayers
+    for i = 1, MAX_PLAYERS - 1, 1 do
+        if np[i] and np[i].connected and
+        (not np[i].currLevelSyncValid or not np[i].currAreaSyncValid) and
+        is_player_in_local_area(gMarioStates[i]) ~= 0 then
+            return false
+        end
+    end
+    return true
+end
+
 --- @param obj Object
 --- @param hitbox ObjectHitbox
 local function obj_set_hitbox(obj, hitbox)
@@ -129,7 +143,7 @@ end
 local function spawn_object(parent, model, behavior)
     if not parent then return nil end
     local obj = spawn_sync_object(behavior, model, parent.oPosX, parent.oPosY, parent.oPosZ, nil)
-    if not obj then print("failed spawn"); return nil end
+    if not obj then error("failed spawn"); return nil end
 
     obj_copy_pos_and_angle(obj, parent)
 
@@ -214,20 +228,11 @@ local function exclamation_box_spawn_contents(exclamation_box_obj, desired_index
                 return false
             end
 
-            network_send_object(spawned_object, true)
+            if is_current_area_sync_valid() then
+                network_init_object(spawned_object, false, { "oBehParams" })
+                network_send_object(spawned_object, true)
+            end
             break
-        end
-    end
-    return true
-end
-
----@return boolean
-local function is_current_area_sync_valid()
-    local np
-    for i = 0, MAX_PLAYERS - 1, 1 do
-        np = gNetworkPlayers[i]
-        if np and np.connected and (not np.currLevelSyncValid or not np.currAreaSyncValid) then
-            return false
         end
     end
     return true
